@@ -253,7 +253,15 @@ function financeRoutes(collections) {
   };
 
   // সার্ভার স্টার্টআপে স্বয়ংক্রিয়ভাবে ফান্ড ও ইনডেক্স নিশ্চিত করা
-  initializeFinanceFundsAndIndexes();
+  // সার্ভার স্টার্টআপে স্বয়ংক্রিয়ভাবে ফান্ড ও ইনডেক্স নিশ্চিত করা (যদি DB কানেক্টেড থাকে)
+  try {
+    const { getDatabase } = require("../config/db");
+    if (getDatabase()) {
+      initializeFinanceFundsAndIndexes().catch((err) =>
+        console.error("Finance funds initialization error:", err)
+      );
+    }
+  } catch (_) {}
 
   /**
    * ০.১. প্রাথমিক ফান্ড ও প্রারম্ভিক ব্যালেন্স সিড করার API (Idempotent)

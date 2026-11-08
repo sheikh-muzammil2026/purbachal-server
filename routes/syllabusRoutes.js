@@ -267,7 +267,15 @@ function syllabusRoutes(collectionsOrApp, helpers, database) {
     }
   };
 
-  ensureSyllabusData();
+  // ensureSyllabusData is called on demand inside GET /api/syllabus
+  try {
+    const { getDatabase } = require("../config/db");
+    if (getDatabase()) {
+      ensureSyllabusData().catch((err) =>
+        console.error("Error ensuring syllabus data:", err)
+      );
+    }
+  } catch (_) {}
 
   /**
    * শ্রেণি ও বিষয় সম্পর্কিত সিলেবাস পাওয়ার API

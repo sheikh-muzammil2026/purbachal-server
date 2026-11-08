@@ -163,15 +163,14 @@ function examRoutes(collections, helpers, database) {
           fallbackGrouped[hall][cls] = (fallbackGrouped[hall][cls] || 0) + 1;
         });
 
-        res.status(200).json({
+        return res.status(200).json({
           success: true,
           data: fallbackGrouped,
           validationError: true,
         });
-        return;
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: groupedData,
       });

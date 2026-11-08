@@ -6,96 +6,185 @@ try {
   dns.setDefaultResultOrder("ipv4first");
 } catch (_) {}
 
-const uri = process.env.MONGODB_URI;
-
-// MongoDB Client Setup
-const client = new MongoClient(uri, {
+const options = {
+  serverSelectionTimeoutMS: 5000,
+  connectTimeoutMS: 5000,
+  socketTimeoutMS: 10000,
+  maxPoolSize: 10,
+  minPoolSize: 1,
   serverApi: {
     version: ServerApiVersion.v1,
     strict: false,
     deprecationErrors: true,
   },
-});
+};
 
+let client = null;
 let database = null;
 let collections = {};
 
+// Helper: check if a Mongo client instance is closed
+function isClientClosed(c) {
+  if (!c) return true;
+  if (c.s?.hasBeenClosed) return true;
+  if (
+    c.topology &&
+    (c.topology.isClosed?.() || c.topology.s?.state === "closed")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+// Map collection names to their database collection
+function initializeCollections(db) {
+  return {
+    admissionCollection: db.collection("admissions"),
+    countersCollection: db.collection("counters"),
+    studentsCollection: db.collection("students"),
+    deletedIdsCollection: db.collection("deleted_student_ids"),
+    galleryCollection: db.collection("gallery"),
+    settingsCollection: db.collection("settings"),
+    fundsCollection: db.collection("finance_funds"),
+    feeStructuresCollection: db.collection("fee_structures"),
+    receiptsCollection: db.collection("finance_receipts"),
+    marksCollection: db.collection("marks"),
+    examsCollection: db.collection("exams"),
+    feesCollection: db.collection("fees"),
+    routinesCollection: db.collection("routine"),
+    seatPlansCollection: db.collection("seat_plan"),
+    financeIncomesCollection: db.collection("finance_incomes"),
+    financeExpensesCollection: db.collection("finance_expenses"),
+    financeCategoriesCollection: db.collection("finance_categories"),
+    teachersCollection: db.collection("teachers"),
+    usersCollection: db.collection("user"),
+    accountsCollection: db.collection("account"),
+    verificationTokensCollection: db.collection("verification_tokens"),
+    syllabusCollection: db.collection("syllabus"),
+    studentAttendanceCollection: db.collection("students_attendance"),
+    staffCollection: db.collection("staff"),
+    staffAttendanceCollection: db.collection("staffattendance"),
+    teacherAttendanceCollection: db.collection("teacherattendance"),
+  };
+}
+
+/**
+ * Serverless-optimized MongoDB connection with global promise caching
+ */
 async function connectDB() {
-  // ডাটাবেজ কানেকশন (স্বয়ংক্রিয় রিট্রাই সহ)
-  let connected = false;
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    try {
-      await client.connect();
-      connected = true;
-      console.log("MongoDB-র সাথে সফলভাবে কানেক্টেড হয়েছে! 🚀");
-      break;
-    } catch (connErr) {
-      console.warn(
-        `MongoDB কানেকশন প্রচেষ্টা ${attempt} ব্যর্থ: ${connErr.message}. ৩ সেকেন্ড পর পুনরায় চেষ্টা করা হচ্ছে...`,
-      );
-      if (attempt === 5) throw connErr;
-      await new Promise((r) => setTimeout(r, 3000));
-    }
+  const uri = process.env.MONGODB_URI;
+  if (!uri || typeof uri !== "string" || !uri.trim()) {
+    throw new Error(
+      "Missing MONGODB_URI environment variable. Please configure MONGODB_URI in your Vercel Project Settings."
+    );
   }
 
-  database = client.db("aimhabiganj");
+  // Fast path: client already connected and topology is alive
+  if (client && !isClientClosed(client) && database) {
+    return { client, database, collections };
+  }
 
-  // কালেকশনসমূহ
-  collections = {
-    admissionCollection: database.collection("admissions"),
-    countersCollection: database.collection("counters"),
-    studentsCollection: database.collection("students"),
-    deletedIdsCollection: database.collection("deleted_student_ids"),
-    galleryCollection: database.collection("gallery"),
-    settingsCollection: database.collection("settings"),
-    fundsCollection: database.collection("finance_funds"),
-    feeStructuresCollection: database.collection("fee_structures"),
-    receiptsCollection: database.collection("finance_receipts"),
-    marksCollection: database.collection("marks"),
-    examsCollection: database.collection("exams"),
-    feesCollection: database.collection("fees"),
-    routinesCollection: database.collection("routine"),
-    seatPlansCollection: database.collection("seat_plan"),
-    financeIncomesCollection: database.collection("finance_incomes"),
-    financeExpensesCollection: database.collection("finance_expenses"),
-    financeCategoriesCollection: database.collection("finance_categories"),
-    teachersCollection: database.collection("teachers"),
-    usersCollection: database.collection("user"),
-    accountsCollection: database.collection("account"),
-    verificationTokensCollection: database.collection(
-      "verification_tokens",
-    ),
-    syllabusCollection: database.collection("syllabus"),
-    studentAttendanceCollection: database.collection(
-      "students_attendance",
-    ),
-    staffCollection: database.collection("staff"),
-    staffAttendanceCollection: database.collection("staffattendance"),
-    teacherAttendanceCollection: database.collection("teacherattendance"),
-  };
-
-  // ডুপ্লিকেট মার্কস রোধে ইউনিক কম্পাউন্ড ইনডেক্স নিশ্চিত করা
-  collections.marksCollection
-    .createIndex(
-      { studentId: 1, year: 1, subject: 1 },
-      { unique: true, name: "unique_student_year_subject" },
-    )
-    .catch((idxErr) => {
-      console.warn(
-        "Marks unique index warning:",
-        idxErr?.message || idxErr,
-      );
+  // Reuse or initialize the global connection promise across serverless invocations
+  if (!global._mongoClientPromise || isClientClosed(client)) {
+    client = new MongoClient(uri, options);
+    global._mongoClientPromise = client.connect().catch((err) => {
+      global._mongoClientPromise = null;
+      throw err;
     });
+  }
 
-  return { client, database, collections };
+  try {
+    const connectedClient = await global._mongoClientPromise;
+    client = connectedClient;
+    database = client.db("aimhabiganj");
+    collections = initializeCollections(database);
+
+    // Ensure compound index safely in background without blocking
+    if (collections.marksCollection) {
+      collections.marksCollection
+        .createIndex(
+          { studentId: 1, year: 1, subject: 1 },
+          { unique: true, name: "unique_student_year_subject", background: true }
+        )
+        .catch((idxErr) => {
+          console.warn("Marks unique index warning:", idxErr?.message || idxErr);
+        });
+    }
+
+    return { client, database, collections };
+  } catch (error) {
+    global._mongoClientPromise = null;
+    console.error("MongoDB Connection Error:", error.message);
+    throw error;
+  }
 }
 
 const getDatabase = () => database;
 const getCollections = () => collections;
 
+/**
+ * Proxy for database object to allow synchronous routing setup
+ */
+const dbProxy = new Proxy({}, {
+  get(target, prop) {
+    if (prop === "collection") {
+      return (collectionName) => {
+        return new Proxy({}, {
+          get(colTarget, colProp) {
+            if (!database) {
+              throw new Error("Database not connected yet. Await connectDB() before querying.");
+            }
+            const actualCol = database.collection(collectionName);
+            const val = Reflect.get(actualCol, colProp);
+            return typeof val === "function" ? val.bind(actualCol) : val;
+          },
+        });
+      };
+    }
+    if (!database) {
+      throw new Error("Database not connected yet. Await connectDB() before querying.");
+    }
+    const val = Reflect.get(database, prop);
+    return typeof val === "function" ? val.bind(database) : val;
+  },
+});
+
+/**
+ * Proxy for collections object to allow synchronous routing setup
+ */
+const collectionsProxy = new Proxy({}, {
+  get(target, prop) {
+    return new Proxy({}, {
+      get(colTarget, colProp) {
+        if (!database || !collections[prop]) {
+          throw new Error(`Collection '${String(prop)}' accessed before database connection. Await connectDB() first.`);
+        }
+        const actualCol = collections[prop];
+        const val = Reflect.get(actualCol, colProp);
+        return typeof val === "function" ? val.bind(actualCol) : val;
+      },
+    });
+  },
+});
+
+/**
+ * Proxy for client object to avoid premature unhandled initialization
+ */
+const clientProxy = new Proxy({}, {
+  get(target, prop) {
+    if (!client) {
+      throw new Error("MongoClient not initialized yet. Await connectDB() first.");
+    }
+    const val = Reflect.get(client, prop);
+    return typeof val === "function" ? val.bind(client) : val;
+  },
+});
+
 module.exports = {
-  client,
+  client: clientProxy,
   connectDB,
   getDatabase,
   getCollections,
+  dbProxy,
+  collectionsProxy,
 };
