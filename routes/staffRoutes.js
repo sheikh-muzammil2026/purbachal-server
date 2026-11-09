@@ -71,13 +71,14 @@ function staffRoutes(collections, authHelpers, database) {
     };
   }
 
-  // Helper to resolve active staff collection (staffs or staff)
+  // Helper to resolve active staff collection (staff or staffs)
   const getActiveStaffCol = async () => {
-    if (collections.staffsCollection) return collections.staffsCollection;
     if (database) {
       try {
-        const count = await database.collection("staffs").countDocuments();
-        if (count > 0) return database.collection("staffs");
+        const staffCount = await staffCollection.countDocuments();
+        if (staffCount > 0) return staffCollection;
+        const staffsCount = await database.collection("staffs").countDocuments();
+        if (staffsCount > 0) return database.collection("staffs");
       } catch (_) {}
     }
     return staffCollection;

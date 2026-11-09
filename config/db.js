@@ -63,17 +63,48 @@ function initializeCollections(db) {
     syllabusCollection: db.collection("syllabus"),
     studentAttendanceCollection: db.collection("students_attendance"),
     staffCollection: db.collection("staff"),
+    staffsCollection: db.collection("staffs"),
     staffAttendanceCollection: db.collection("staffattendance"),
     teacherAttendanceCollection: db.collection("teacherattendance"),
   };
+}
+
+function sanitizeEnvValue(val, keyName = "") {
+  if (!val || typeof val !== "string") return "";
+  let cleaned = val.trim();
+  while (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  if (keyName) {
+    const prefixRegex = new RegExp(`^${keyName}\\s*=\\s*`, "i");
+    cleaned = cleaned.replace(prefixRegex, "").trim();
+  }
+  while (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  if (keyName === "MONGODB_URI" && !cleaned.startsWith("mongodb")) {
+    const match = cleaned.match(/(mongodb(?:\+srv)?:\/\/.+)/i);
+    if (match) {
+      cleaned = match[1].trim().replace(/^["']|["']$/g, "");
+    }
+  }
+  return cleaned;
 }
 
 /**
  * Serverless-optimized MongoDB connection with global promise caching
  */
 async function connectDB() {
-  const uri = (process.env.MONGODB_URI || "").trim();
-  const dbName = (process.env.MONGODB_DB_NAME || "aimpurbachal").trim();
+  const uri = sanitizeEnvValue(process.env.MONGODB_URI, "MONGODB_URI");
+  const dbName =
+    sanitizeEnvValue(process.env.MONGODB_DB_NAME, "MONGODB_DB_NAME") ||
+    "aimpurbachal";
   if (!uri) {
     throw new Error(
       "Missing MONGODB_URI environment variable. Please configure MONGODB_URI in your Vercel Project Settings."
@@ -143,10 +174,16 @@ const getCollections = () => collections;
  */
 const dbProxy = new Proxy({}, {
   get(target, prop) {
+    if (prop === "then" || typeof prop === "symbol") {
+      return undefined;
+    }
     if (prop === "collection") {
       return (collectionName) => {
         return new Proxy({}, {
           get(colTarget, colProp) {
+            if (colProp === "then" || typeof colProp === "symbol") {
+              return undefined;
+            }
             if (!database) {
               throw new Error("Database not connected yet. Await connectDB() before querying.");
             }
@@ -170,8 +207,17 @@ const dbProxy = new Proxy({}, {
  */
 const collectionsProxy = new Proxy({}, {
   get(target, prop) {
+    if (prop === "then" || prop === "use" || typeof prop === "symbol") {
+      return undefined;
+    }
+    if (database && !(prop in collections)) {
+      return undefined;
+    }
     return new Proxy({}, {
       get(colTarget, colProp) {
+        if (colProp === "then" || typeof colProp === "symbol") {
+          return undefined;
+        }
         if (!database || !collections[prop]) {
           throw new Error(`Collection '${String(prop)}' accessed before database connection. Await connectDB() first.`);
         }

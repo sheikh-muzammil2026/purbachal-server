@@ -2,8 +2,10 @@ const allowedOrigins = [
   "https://aimpurbachal.com",
   "https://www.aimpurbachal.com",
   "https://api.aimpurbachal.com",
+  "https://aimpurbachal.vercel.app",
+  "https://purbachal-server.vercel.app",
   "https://aimhabiganj.vercel.app",
-"https://aim-server.vercel.app",
+  "https://aim-server.vercel.app",
 ];
 
 const isOriginAllowed = (origin) => {
