@@ -72,23 +72,39 @@ function initializeCollections(db) {
  * Serverless-optimized MongoDB connection with global promise caching
  */
 async function connectDB() {
-  const uri = process.env.MONGODB_URI;
-  if (!uri || typeof uri !== "string" || !uri.trim()) {
+  const uri = (process.env.MONGODB_URI || "").trim();
+  const dbName = (process.env.MONGODB_DB_NAME || "aimpurbachal").trim();
+  if (!uri) {
     throw new Error(
       "Missing MONGODB_URI environment variable. Please configure MONGODB_URI in your Vercel Project Settings."
     );
   }
 
-  // Fast path: client already connected and topology is alive
-  if (client && !isClientClosed(client) && database) {
+  // Fast path: client already connected, URI matches, and topology is alive
+  if (
+    client &&
+    !isClientClosed(client) &&
+    database &&
+    global._mongoClientUri === uri &&
+    database.databaseName === dbName
+  ) {
     return { client, database, collections };
   }
 
   // Reuse or initialize the global connection promise across serverless invocations
-  if (!global._mongoClientPromise || isClientClosed(client)) {
+  if (
+    !global._mongoClientPromise ||
+    isClientClosed(client) ||
+    global._mongoClientUri !== uri
+  ) {
+    if (client) {
+      client.close().catch(() => {});
+    }
     client = new MongoClient(uri, options);
+    global._mongoClientUri = uri;
     global._mongoClientPromise = client.connect().catch((err) => {
       global._mongoClientPromise = null;
+      global._mongoClientUri = null;
       throw err;
     });
   }
@@ -96,7 +112,7 @@ async function connectDB() {
   try {
     const connectedClient = await global._mongoClientPromise;
     client = connectedClient;
-    database = client.db("aimhabiganj");
+    database = client.db(dbName);
     collections = initializeCollections(database);
 
     // Ensure compound index safely in background without blocking
