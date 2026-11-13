@@ -1,9 +1,9 @@
 // Fixed Geofence Configuration for Madrasa premises
 // As-Salam Ideal Madrasah (AIM) Purbachal Campus
 const MADRASA_LOCATION = {
-  LATITUDE: parseFloat(process.env.MADRASA_LAT || "24.381197"),
-  LONGITUDE: parseFloat(process.env.MADRASA_LNG || "91.416974"),
-  RADIUS_METERS: parseFloat(process.env.MADRASA_RADIUS || "200"),
+  LATITUDE: parseFloat(process.env.MADRASA_LAT || "23.860061"),
+  LONGITUDE: parseFloat(process.env.MADRASA_LNG || "90.546755"),
+  RADIUS_METERS: parseFloat(process.env.MADRASA_RADIUS || "15"),
   MAX_ALLOWED_ACCURACY_METERS: 500,
   ACCURACY_TOLERANCE_METERS: 50,
   NAME: "আস সালাম আইডিয়াল মাদরাসা (এইম) পুর্বাচল ক্যাম্পাস",
@@ -67,7 +67,10 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
 
   const a =
     Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    Math.cos(phi1) *
+      Math.cos(phi2) *
+      Math.sin(deltaLambda / 2) *
+      Math.sin(deltaLambda / 2);
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -81,7 +84,7 @@ function isWithinMadrasaGeofence(
   userLat,
   userLng,
   customRadius = MADRASA_LOCATION.RADIUS_METERS,
-  accuracy = 0
+  accuracy = 0,
 ) {
   const latNum = Number(userLat);
   const lngNum = Number(userLng);
@@ -105,16 +108,22 @@ function isWithinMadrasaGeofence(
     };
   }
 
-  const accNum = Number.isFinite(Number(accuracy)) && Number(accuracy) > 0 ? Math.round(Number(accuracy)) : 0;
+  const accNum =
+    Number.isFinite(Number(accuracy)) && Number(accuracy) > 0
+      ? Math.round(Number(accuracy))
+      : 0;
   const distance = calculateDistanceMeters(
     latNum,
     lngNum,
     MADRASA_LOCATION.LATITUDE,
-    MADRASA_LOCATION.LONGITUDE
+    MADRASA_LOCATION.LONGITUDE,
   );
 
   // Allow minor GPS jitter up to ACCURACY_TOLERANCE_METERS (50m) if accuracy is reported
-  const tolerance = Math.min(accNum, MADRASA_LOCATION.ACCURACY_TOLERANCE_METERS || 50);
+  const tolerance = Math.min(
+    accNum,
+    MADRASA_LOCATION.ACCURACY_TOLERANCE_METERS || 50,
+  );
   const effectiveThreshold = customRadius + tolerance;
 
   return {
@@ -190,8 +199,7 @@ function evaluateCheckInStatus(date = new Date()) {
 function evaluateCheckOutStatus(date = new Date()) {
   const { minutesSinceMidnight } = getDhakaTime(date);
   const cutoffMinutes =
-    ATTENDANCE_RULES.OFFICE_END_HOUR * 60 +
-    ATTENDANCE_RULES.OFFICE_END_MINUTE;
+    ATTENDANCE_RULES.OFFICE_END_HOUR * 60 + ATTENDANCE_RULES.OFFICE_END_MINUTE;
 
   return minutesSinceMidnight >= cutoffMinutes ? "On Time" : "Early";
 }
@@ -249,7 +257,8 @@ function getStaffShiftPhase(date = new Date()) {
   return {
     currentTime: formattedTime,
     isTerm1OnTime: minutesSinceMidnight <= t1Cutoff,
-    isTerm2Open: minutesSinceMidnight >= t2Start && minutesSinceMidnight <= t2End,
+    isTerm2Open:
+      minutesSinceMidnight >= t2Start && minutesSinceMidnight <= t2End,
     isTerm2Early: minutesSinceMidnight < t2Start,
     isTerm2Overtime: minutesSinceMidnight > t2End,
     term1CutoffTime: "05:30 AM",
@@ -362,7 +371,12 @@ const HIFZ_ATTENDANCE_RULES = {
  */
 function getTeacherCategory(designation = "") {
   const norm = String(designation || "").trim();
-  if (norm.includes("হিফজ") || norm.includes("হিফয") || norm.includes("হিফ্জ") || /hifz|hifdh/i.test(norm)) {
+  if (
+    norm.includes("হিফজ") ||
+    norm.includes("হিফয") ||
+    norm.includes("হিফ্জ") ||
+    /hifz|hifdh/i.test(norm)
+  ) {
     return "hifz";
   }
   // Check 'অনাবাসিক' before 'আবাসিক' because 'অনাবাসিক' contains 'আবাসিক'
@@ -391,7 +405,11 @@ function getTeacherShiftRules(category) {
  * @param {string} shiftId ('shift1'|'shift2'|'shift3')
  * @param {Date|string|number} date
  */
-function evaluateTeacherShiftCheckIn(category, shiftId = "shift1", date = new Date()) {
+function evaluateTeacherShiftCheckIn(
+  category,
+  shiftId = "shift1",
+  date = new Date(),
+) {
   const { minutesSinceMidnight } = getDhakaTime(date);
 
   if (category === "regular" || !category) {
@@ -413,7 +431,8 @@ function evaluateTeacherShiftCheckIn(category, shiftId = "shift1", date = new Da
     return { status: "On Time", isLate: false };
   }
 
-  const cutoff = shiftRule.checkInCutoffHour * 60 + shiftRule.checkInCutoffMinute;
+  const cutoff =
+    shiftRule.checkInCutoffHour * 60 + shiftRule.checkInCutoffMinute;
   const isLate = minutesSinceMidnight > cutoff;
 
   return {
@@ -430,13 +449,18 @@ function evaluateTeacherShiftCheckIn(category, shiftId = "shift1", date = new Da
  * @param {string} shiftId ('shift1'|'shift2'|'shift3')
  * @param {Date|string|number} date
  */
-function evaluateTeacherShiftCheckOut(category, shiftId = "shift1", date = new Date()) {
+function evaluateTeacherShiftCheckOut(
+  category,
+  shiftId = "shift1",
+  date = new Date(),
+) {
   const { minutesSinceMidnight } = getDhakaTime(date);
 
   if (category === "regular" || !category) {
     const isEarly =
       minutesSinceMidnight <
-      ATTENDANCE_RULES.OFFICE_END_HOUR * 60 + ATTENDANCE_RULES.OFFICE_END_MINUTE;
+      ATTENDANCE_RULES.OFFICE_END_HOUR * 60 +
+        ATTENDANCE_RULES.OFFICE_END_MINUTE;
     return {
       status: isEarly ? "Early" : "On Time",
       isEarly,
@@ -451,7 +475,8 @@ function evaluateTeacherShiftCheckOut(category, shiftId = "shift1", date = new D
     return { status: "On Time", isEarly: false };
   }
 
-  const startOut = shiftRule.checkOutStartHour * 60 + shiftRule.checkOutStartMinute;
+  const startOut =
+    shiftRule.checkOutStartHour * 60 + shiftRule.checkOutStartMinute;
   const isEarly = minutesSinceMidnight < startOut;
 
   return {

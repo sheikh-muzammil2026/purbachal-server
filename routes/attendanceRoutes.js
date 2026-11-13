@@ -70,8 +70,7 @@ function attendanceRoutes(collections, helpers) {
           attendanceRate:
             sanitizedRecords.length > 0
               ? Math.round(
-                  ((presentCount + lateCount) / sanitizedRecords.length) *
-                    100,
+                  ((presentCount + lateCount) / sanitizedRecords.length) * 100,
                 )
               : 0,
           recordedBy: recordedBy || "admin",
@@ -90,7 +89,7 @@ function attendanceRoutes(collections, helpers) {
 
       res.status(200).json({
         success: true,
-        message: "হাজিরা সফলভাবে সংরক্ষিত ও আপডেট হয়েছে!",
+        message: "এ্যাটেন্ডেন্স সফলভাবে সংরক্ষিত ও আপডেট হয়েছে!",
         data: {
           date,
           className,
@@ -104,7 +103,7 @@ function attendanceRoutes(collections, helpers) {
       console.error("Save Student Attendance Error:", error);
       res.status(500).json({
         success: false,
-        message: "হাজিরা সংরক্ষণ করতে ব্যর্থ হয়েছে।",
+        message: "এ্যাটেন্ডেন্স সংরক্ষণ করতে ব্যর্থ হয়েছে।",
         error: error.message,
       });
     }
@@ -141,7 +140,7 @@ function attendanceRoutes(collections, helpers) {
       console.error("Fetch Student Attendance Error:", error);
       res.status(500).json({
         success: false,
-        message: "হাজিরা তথ্য লোড করতে ব্যর্থ হয়েছে।",
+        message: "এ্যাটেন্ডেন্স তথ্য লোড করতে ব্যর্থ হয়েছে।",
         error: error.message,
       });
     }
@@ -211,7 +210,7 @@ function attendanceRoutes(collections, helpers) {
       console.error("Attendance Report API Error:", error);
       res.status(500).json({
         success: false,
-        message: "হাজিরা রিপোর্ট লোড করতে ব্যর্থ হয়েছে।",
+        message: "এ্যাটেন্ডেন্স রিপোর্ট লোড করতে ব্যর্থ হয়েছে।",
         error: error.message,
       });
     }

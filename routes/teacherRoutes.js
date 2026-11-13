@@ -18,7 +18,8 @@ const {
 
 function teacherRoutes(collections) {
   const router = express.Router();
-  const { teachersCollection, teacherAttendanceCollection, usersCollection } = collections;
+  const { teachersCollection, teacherAttendanceCollection, usersCollection } =
+    collections;
 
   function normalizeDesignation(rawDesignation = "") {
     const d = String(rawDesignation || "").trim();
@@ -80,12 +81,23 @@ function teacherRoutes(collections) {
       }
 
       const cleanEmail = String(email).trim();
-      const cleanTeacherId = teacherId !== undefined ? String(teacherId).trim() : undefined;
+      const cleanTeacherId =
+        teacherId !== undefined ? String(teacherId).trim() : undefined;
 
       if (cleanTeacherId) {
         const duplicate = await teachersCollection.findOne({
-          teacherId: { $regex: new RegExp(`^${cleanTeacherId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
-          email: { $not: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+          teacherId: {
+            $regex: new RegExp(
+              `^${cleanTeacherId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+              "i",
+            ),
+          },
+          email: {
+            $not: new RegExp(
+              `^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+              "i",
+            ),
+          },
         });
         if (duplicate) {
           return res.status(400).json({
@@ -95,7 +107,14 @@ function teacherRoutes(collections) {
         }
       }
 
-      const filter = { email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } };
+      const filter = {
+        email: {
+          $regex: new RegExp(
+            `^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i",
+          ),
+        },
+      };
       const setFields = {
         email: cleanEmail,
         fullName,
@@ -111,8 +130,8 @@ function teacherRoutes(collections) {
           bankAccount && typeof bankAccount === "object"
             ? bankAccount
             : bankAccount
-            ? { accountNumber: String(bankAccount) }
-            : {},
+              ? { accountNumber: String(bankAccount) }
+              : {},
         bio: bio || "",
         profileImage: profileImage || "",
         socialLinks: socialLinks || {},
@@ -153,8 +172,20 @@ function teacherRoutes(collections) {
       if (cleanTeacherId && teacherAttendanceCollection) {
         await teacherAttendanceCollection
           .updateMany(
-            { teacherEmail: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } },
-            { $set: { teacherId: cleanTeacherId, teacherDesignation: setFields.designation } }
+            {
+              teacherEmail: {
+                $regex: new RegExp(
+                  `^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+                  "i",
+                ),
+              },
+            },
+            {
+              $set: {
+                teacherId: cleanTeacherId,
+                teacherDesignation: setFields.designation,
+              },
+            },
           )
           .catch(() => {});
       }
@@ -220,7 +251,12 @@ function teacherRoutes(collections) {
         teacherUsers = await usersCollection
           .find({
             $or: [
-              { role: { $regex: /^(teacher|residential_teacher|hifz_teacher|admin|superadmin)$/i } },
+              {
+                role: {
+                  $regex:
+                    /^(teacher|residential_teacher|hifz_teacher|admin|superadmin)$/i,
+                },
+              },
               { permissions: "teacher" },
             ],
           })
@@ -252,22 +288,38 @@ function teacherRoutes(collections) {
         const profile = emailKey ? profileMap.get(emailKey) : null;
 
         let education = "";
-        if (typeof profile?.education === "string" && profile.education.trim()) {
+        if (
+          typeof profile?.education === "string" &&
+          profile.education.trim()
+        ) {
           education = profile.education.trim();
-        } else if (Array.isArray(profile?.academic) && profile.academic.length > 0) {
+        } else if (
+          Array.isArray(profile?.academic) &&
+          profile.academic.length > 0
+        ) {
           education = profile.academic
             .map((a) => a.degree || a.title || a.name || "")
             .filter(Boolean)
             .join(", ");
         }
 
-        const name = profile?.fullName?.trim() || profile?.name?.trim() || user.name?.trim() || "সম্মানিত শিক্ষক";
-        const designation = profile?.designation?.trim() || user.designation?.trim() || "শিক্ষক";
-        const department = profile?.department?.trim() || profile?.subject?.trim() || "";
-        const image = profile?.profileImage || profile?.image || user.image || "";
+        const name =
+          profile?.fullName?.trim() ||
+          profile?.name?.trim() ||
+          user.name?.trim() ||
+          "সম্মানিত শিক্ষক";
+        const designation =
+          profile?.designation?.trim() || user.designation?.trim() || "শিক্ষক";
+        const department =
+          profile?.department?.trim() || profile?.subject?.trim() || "";
+        const image =
+          profile?.profileImage || profile?.image || user.image || "";
 
         faculty.push({
-          id: user._id?.toString() || profile?._id?.toString() || `faculty-${index + 1}`,
+          id:
+            user._id?.toString() ||
+            profile?._id?.toString() ||
+            `faculty-${index + 1}`,
           _id: profile?._id?.toString() || user._id?.toString(),
           name,
           fullName: name,
@@ -282,9 +334,21 @@ function teacherRoutes(collections) {
           socialLinks: profile?.socialLinks || {},
           bio: profile?.bio || "",
           academic: Array.isArray(profile?.academic) ? profile.academic : [],
-          experience: Array.isArray(profile?.experience) ? profile.experience : [],
-          order: typeof profile?.order === "number" ? profile.order : typeof user?.order === "number" ? user.order : index + 1,
-          priority: typeof profile?.priority === "number" ? profile.priority : typeof user?.priority === "number" ? user.priority : 99,
+          experience: Array.isArray(profile?.experience)
+            ? profile.experience
+            : [],
+          order:
+            typeof profile?.order === "number"
+              ? profile.order
+              : typeof user?.order === "number"
+                ? user.order
+                : index + 1,
+          priority:
+            typeof profile?.priority === "number"
+              ? profile.priority
+              : typeof user?.priority === "number"
+                ? user.priority
+                : 99,
         });
       });
 
@@ -293,18 +357,28 @@ function teacherRoutes(collections) {
         if (!emailKey || !addedEmails.has(emailKey)) {
           if (profile.fullName || profile.name) {
             let education = "";
-            if (typeof profile.education === "string" && profile.education.trim()) {
+            if (
+              typeof profile.education === "string" &&
+              profile.education.trim()
+            ) {
               education = profile.education.trim();
-            } else if (Array.isArray(profile.academic) && profile.academic.length > 0) {
+            } else if (
+              Array.isArray(profile.academic) &&
+              profile.academic.length > 0
+            ) {
               education = profile.academic
                 .map((a) => a.degree || a.title || a.name || "")
                 .filter(Boolean)
                 .join(", ");
             }
 
-            const name = profile.fullName?.trim() || profile.name?.trim() || "সম্মানিত শিক্ষক";
+            const name =
+              profile.fullName?.trim() ||
+              profile.name?.trim() ||
+              "সম্মানিত শিক্ষক";
             const designation = profile.designation?.trim() || "শিক্ষক";
-            const department = profile.department?.trim() || profile.subject?.trim() || "";
+            const department =
+              profile.department?.trim() || profile.subject?.trim() || "";
             const image = profile.profileImage || profile.image || "";
 
             faculty.push({
@@ -323,9 +397,13 @@ function teacherRoutes(collections) {
               socialLinks: profile.socialLinks || {},
               bio: profile.bio || "",
               academic: Array.isArray(profile.academic) ? profile.academic : [],
-              experience: Array.isArray(profile.experience) ? profile.experience : [],
-              order: typeof profile.order === "number" ? profile.order : index + 1,
-              priority: typeof profile.priority === "number" ? profile.priority : 99,
+              experience: Array.isArray(profile.experience)
+                ? profile.experience
+                : [],
+              order:
+                typeof profile.order === "number" ? profile.order : index + 1,
+              priority:
+                typeof profile.priority === "number" ? profile.priority : 99,
             });
           }
         }
@@ -348,7 +426,7 @@ function teacherRoutes(collections) {
         filteredFaculty = filteredFaculty.filter(
           (t) =>
             (t.department && t.department.toLowerCase() === deptFilter) ||
-            (t.subject && t.subject.toLowerCase() === deptFilter)
+            (t.subject && t.subject.toLowerCase() === deptFilter),
         );
       }
 
@@ -362,7 +440,7 @@ function teacherRoutes(collections) {
             t.department?.toLowerCase().includes(searchFilter) ||
             t.subject?.toLowerCase().includes(searchFilter) ||
             t.education?.toLowerCase().includes(searchFilter) ||
-            t.phone?.includes(searchFilter)
+            t.phone?.includes(searchFilter),
         );
       }
 
@@ -387,7 +465,11 @@ function teacherRoutes(collections) {
   // Helper: Merge teachersCollection and usersCollection (role: teacher) so no category is omitted
   async function getUnifiedTeachersCatalog() {
     const teachersProfileList = teachersCollection
-      ? await teachersCollection.find({}).sort({ order: 1, priority: 1, createdAt: 1 }).toArray().catch(() => [])
+      ? await teachersCollection
+          .find({})
+          .sort({ order: 1, priority: 1, createdAt: 1 })
+          .toArray()
+          .catch(() => [])
       : [];
 
     let teacherUsers = [];
@@ -439,7 +521,11 @@ function teacherRoutes(collections) {
         unifiedCatalog.push({
           _id: u._id,
           email: u.email || "",
-          fullName: u.name || u.fullName || emailLower.split("@")[0] || "নাম পাওয়া যায়নি",
+          fullName:
+            u.name ||
+            u.fullName ||
+            emailLower.split("@")[0] ||
+            "নাম পাওয়া যায়নি",
           designation: normDesignation,
           category: getTeacherCategory(normDesignation),
           phone: u.phone || "",
@@ -468,13 +554,23 @@ function teacherRoutes(collections) {
     let teacher = null;
     if (teachersCollection) {
       teacher = await teachersCollection.findOne({
-        email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        email: {
+          $regex: new RegExp(
+            `^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i",
+          ),
+        },
       });
     }
 
     if (!teacher && usersCollection) {
       const userDoc = await usersCollection.findOne({
-        email: { $regex: new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") },
+        email: {
+          $regex: new RegExp(
+            `^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            "i",
+          ),
+        },
       });
       if (userDoc) {
         teacher = {
@@ -494,7 +590,9 @@ function teacherRoutes(collections) {
     const resolvedTeacherId =
       customId && !/^[a-f\d]{24}$/i.test(customId)
         ? customId
-        : `AIM-T-${String(teacher._id || "001").slice(-4).toUpperCase()}`;
+        : `AIM-T-${String(teacher._id || "001")
+            .slice(-4)
+            .toUpperCase()}`;
 
     const normDesignation = normalizeDesignation(teacher.designation);
 
@@ -540,11 +638,15 @@ function teacherRoutes(collections) {
       const effectiveLng = Number(lng);
 
       if (!mockInPremises) {
-        const geofenceResult = isWithinMadrasaGeofence(effectiveLat, effectiveLng);
+        const geofenceResult = isWithinMadrasaGeofence(
+          effectiveLat,
+          effectiveLng,
+        );
         if (!geofenceResult.isInside) {
           return res.status(403).json({
             success: false,
-            message: "You must be inside the madrasa premises to submit attendance.",
+            message:
+              "You must be inside the madrasa premises to submit attendance.",
             distance: geofenceResult.distance,
             threshold: geofenceResult.threshold,
           });
@@ -553,9 +655,11 @@ function teacherRoutes(collections) {
 
       const category = getTeacherCategory(user.designation);
       const isMultiShift = category === "residential" || category === "hifz";
-      const shiftId = body.shiftId || (isMultiShift ? getActiveTeacherShift(category) : null);
+      const shiftId =
+        body.shiftId || (isMultiShift ? getActiveTeacherShift(category) : null);
       const shiftRules = getTeacherShiftRules(category);
-      const currentShiftRule = (shiftRules && shiftId) ? shiftRules[shiftId] : null;
+      const currentShiftRule =
+        shiftRules && shiftId ? shiftRules[shiftId] : null;
 
       const { dateStr } = getDhakaTime();
       const now = new Date();
@@ -625,11 +729,12 @@ function teacherRoutes(collections) {
                 checkInLocation: attendanceDoc.checkInLocation,
                 updatedAt: now,
               },
-            }
+            },
           );
           attendanceDoc._id = existing._id;
         } else {
-          const result = await teacherAttendanceCollection.insertOne(attendanceDoc);
+          const result =
+            await teacherAttendanceCollection.insertOne(attendanceDoc);
           attendanceDoc._id = result.insertedId;
         }
 
@@ -679,13 +784,18 @@ function teacherRoutes(collections) {
             updateFields.checkInTime = now.toISOString();
             updateFields.checkInStatus = checkInStatus;
             updateFields.checkInComment = checkInComment || null;
-            updateFields.checkInLocation = { lat: effectiveLat, lng: effectiveLng };
+            updateFields.checkInLocation = {
+              lat: effectiveLat,
+              lng: effectiveLng,
+            };
           }
           await teacherAttendanceCollection.updateOne(
             { _id: existing._id },
-            { $set: updateFields }
+            { $set: updateFields },
           );
-          updatedDoc = await teacherAttendanceCollection.findOne({ _id: existing._id });
+          updatedDoc = await teacherAttendanceCollection.findOne({
+            _id: existing._id,
+          });
         } else {
           const docToInsert = {
             teacherEmail: user.email,
@@ -707,7 +817,8 @@ function teacherRoutes(collections) {
             createdAt: now,
             updatedAt: now,
           };
-          const result = await teacherAttendanceCollection.insertOne(docToInsert);
+          const result =
+            await teacherAttendanceCollection.insertOne(docToInsert);
           docToInsert._id = result.insertedId;
           updatedDoc = docToInsert;
         }
@@ -727,7 +838,7 @@ function teacherRoutes(collections) {
       console.error("Teacher Check-in error:", error);
       res.status(500).json({
         success: false,
-        message: "হাজিরা সাবমিট করতে সমস্যা হয়েছে।",
+        message: "এ্যাটেন্ডেন্স সাবমিট করতে সমস্যা হয়েছে।",
         error: error.message,
       });
     }
@@ -761,11 +872,15 @@ function teacherRoutes(collections) {
       const effectiveLng = Number(lng);
 
       if (!mockInPremises) {
-        const geofenceResult = isWithinMadrasaGeofence(effectiveLat, effectiveLng);
+        const geofenceResult = isWithinMadrasaGeofence(
+          effectiveLat,
+          effectiveLng,
+        );
         if (!geofenceResult.isInside) {
           return res.status(403).json({
             success: false,
-            message: "You must be inside the madrasa premises to submit attendance.",
+            message:
+              "You must be inside the madrasa premises to submit attendance.",
             distance: geofenceResult.distance,
             threshold: geofenceResult.threshold,
           });
@@ -774,9 +889,11 @@ function teacherRoutes(collections) {
 
       const category = getTeacherCategory(user.designation);
       const isMultiShift = category === "residential" || category === "hifz";
-      const shiftId = body.shiftId || (isMultiShift ? getActiveTeacherShift(category) : null);
+      const shiftId =
+        body.shiftId || (isMultiShift ? getActiveTeacherShift(category) : null);
       const shiftRules = getTeacherShiftRules(category);
-      const currentShiftRule = (shiftRules && shiftId) ? shiftRules[shiftId] : null;
+      const currentShiftRule =
+        shiftRules && shiftId ? shiftRules[shiftId] : null;
 
       const { dateStr } = getDhakaTime();
       const now = new Date();
@@ -789,7 +906,11 @@ function teacherRoutes(collections) {
         checkOutStatus = evaluateCheckOutStatus(now);
       }
 
-      const checkOutComment = (body.checkOutComment || body.comment || "").trim();
+      const checkOutComment = (
+        body.checkOutComment ||
+        body.comment ||
+        ""
+      ).trim();
 
       // Enforce early check-out reason comment
       if (checkOutStatus === "Early" && !checkOutComment) {
@@ -797,7 +918,8 @@ function teacherRoutes(collections) {
           success: false,
           requiresComment: true,
           status: "Early",
-          message: "নির্ধারিত সময়ের পূর্বে প্রস্থানের কারণ উল্লেখ করা বাধ্যতামূলক।",
+          message:
+            "নির্ধারিত সময়ের পূর্বে প্রস্থানের কারণ উল্লেখ করা বাধ্যতামূলক।",
         });
       }
 
@@ -819,7 +941,8 @@ function teacherRoutes(collections) {
         if (existing.checkOutTime) {
           return res.status(400).json({
             success: false,
-            message: "আপনি আজকের প্রস্থান হাজিরা (Check-Out) ইতিমধ্যে সম্পন্ন করেছেন।",
+            message:
+              "আপনি আজকের প্রস্থান হাজিরা (Check-Out) ইতিমধ্যে সম্পন্ন করেছেন।",
             attendance: existing,
           });
         }
@@ -839,7 +962,7 @@ function teacherRoutes(collections) {
               checkOutLocation: checkOutLocation,
               updatedAt: now,
             },
-          }
+          },
         );
 
         const updatedDoc = {
@@ -896,17 +1019,19 @@ function teacherRoutes(collections) {
 
         await teacherAttendanceCollection.updateOne(
           { _id: existing._id },
-          { $set: updateFields }
+          { $set: updateFields },
         );
 
-        const updatedDoc = await teacherAttendanceCollection.findOne({ _id: existing._id });
+        const updatedDoc = await teacherAttendanceCollection.findOne({
+          _id: existing._id,
+        });
 
         return res.status(200).json({
           success: true,
           message:
             checkOutStatus === "On Time"
               ? `${currentShiftRule?.name || shiftId}: সময়মতো প্রস্থান হাজিরা নিশ্চিত হয়েছে!`
-              : `${currentShiftRule?.name || shiftId}: সময়ের পূর্বে প্রস্থান নিশ্চিত হয়েছে! (Early Departure)`,
+              : `${currentShiftRule?.name || shiftId}: সময়ের পূর্বে প্রস্থান নিশ্চিত হয়েছে!`,
           checkOutStatus,
           shiftId,
           attendance: updatedDoc,
@@ -1046,9 +1171,11 @@ function teacherRoutes(collections) {
         const emailLower = (teacher.email || "").trim().toLowerCase();
         if (emailLower) processedEmails.add(emailLower);
 
-        const attendance = emailLower ? attendanceByEmail.get(emailLower) : null;
+        const attendance = emailLower
+          ? attendanceByEmail.get(emailLower)
+          : null;
         const normDesignation = normalizeDesignation(
-          teacher.designation || attendance?.teacherDesignation || "শিক্ষক"
+          teacher.designation || attendance?.teacherDesignation || "শিক্ষক",
         );
         const category =
           attendance?.category || getTeacherCategory(normDesignation);
@@ -1063,7 +1190,7 @@ function teacherRoutes(collections) {
         if (hasCheckedIn) {
           if (shiftValues.length > 0) {
             effectiveCheckInStatus = shiftValues.some(
-              (s) => s.checkInStatus === "Late"
+              (s) => s.checkInStatus === "Late",
             )
               ? "Late"
               : "On Time";
@@ -1077,7 +1204,7 @@ function teacherRoutes(collections) {
           const checkedOutShifts = shiftValues.filter((s) => !!s?.checkOutTime);
           if (checkedOutShifts.length > 0) {
             effectiveCheckOutStatus = checkedOutShifts.some(
-              (s) => s.checkOutStatus === "Early"
+              (s) => s.checkOutStatus === "Early",
             )
               ? "Early"
               : "On Time";
@@ -1088,19 +1215,24 @@ function teacherRoutes(collections) {
           mongoId: teacher._id ? teacher._id.toString() : `teacher-${i + 1}`,
           teacherId: teacher.teacherId || formatFallbackTeacherId(i, teacher),
           rawTeacherId: teacher.rawTeacherId || "",
-          teacherName:
-            teacher.fullName || teacher.name || "নাম পাওয়া যায়নি",
+          teacherName: teacher.fullName || teacher.name || "নাম পাওয়া যায়নি",
           teacherEmail: teacher.email || "",
           designation: normDesignation,
           phone: teacher.phone || teacher.mobile || "",
           profileImage: teacher.profileImage || teacher.image || "",
           date: targetDate,
           hasCheckedIn,
-          checkInTime: attendance?.checkInTime || shiftValues[0]?.checkInTime || null,
+          checkInTime:
+            attendance?.checkInTime || shiftValues[0]?.checkInTime || null,
           checkInStatus: effectiveCheckInStatus,
-          checkInLocation: attendance?.checkInLocation || shiftValues[0]?.checkInLocation || null,
+          checkInLocation:
+            attendance?.checkInLocation ||
+            shiftValues[0]?.checkInLocation ||
+            null,
           checkInComment: attendance?.checkInComment || null,
-          hasCheckedOut: !!attendance?.checkOutTime || shiftValues.some((s) => !!s?.checkOutTime),
+          hasCheckedOut:
+            !!attendance?.checkOutTime ||
+            shiftValues.some((s) => !!s?.checkOutTime),
           checkOutTime: attendance?.checkOutTime || null,
           checkOutStatus: effectiveCheckOutStatus,
           checkOutLocation: attendance?.checkOutLocation || null,
@@ -1117,7 +1249,7 @@ function teacherRoutes(collections) {
           processedEmails.add(emailLower);
           const idx = unifiedList.length;
           const normDesignation = normalizeDesignation(
-            attendance.teacherDesignation || "শিক্ষক"
+            attendance.teacherDesignation || "শিক্ষক",
           );
           const category =
             attendance.category || getTeacherCategory(normDesignation);
@@ -1125,12 +1257,13 @@ function teacherRoutes(collections) {
           const shiftValues = attendance?.shifts
             ? Object.values(attendance.shifts).filter((s) => !!s?.checkInTime)
             : [];
-          const hasCheckedIn = !!attendance.checkInTime || shiftValues.length > 0;
+          const hasCheckedIn =
+            !!attendance.checkInTime || shiftValues.length > 0;
 
           let effectiveCheckInStatus = attendance.checkInStatus || "On Time";
           if (shiftValues.length > 0) {
             effectiveCheckInStatus = shiftValues.some(
-              (s) => s.checkInStatus === "Late"
+              (s) => s.checkInStatus === "Late",
             )
               ? "Late"
               : "On Time";
@@ -1140,7 +1273,8 @@ function teacherRoutes(collections) {
             mongoId: attendance._id.toString(),
             teacherId: formatFallbackTeacherId(idx, attendance),
             rawTeacherId:
-              attendance.teacherId && !/^[a-f\d]{24}$/i.test(attendance.teacherId)
+              attendance.teacherId &&
+              !/^[a-f\d]{24}$/i.test(attendance.teacherId)
                 ? attendance.teacherId
                 : "",
             teacherName: attendance.teacherName || attendance.teacherEmail,
@@ -1150,11 +1284,17 @@ function teacherRoutes(collections) {
             profileImage: "",
             date: targetDate,
             hasCheckedIn,
-            checkInTime: attendance.checkInTime || shiftValues[0]?.checkInTime || null,
+            checkInTime:
+              attendance.checkInTime || shiftValues[0]?.checkInTime || null,
             checkInStatus: effectiveCheckInStatus,
-            checkInLocation: attendance.checkInLocation || shiftValues[0]?.checkInLocation || null,
+            checkInLocation:
+              attendance.checkInLocation ||
+              shiftValues[0]?.checkInLocation ||
+              null,
             checkInComment: attendance.checkInComment || null,
-            hasCheckedOut: !!attendance.checkOutTime || shiftValues.some((s) => !!s?.checkOutTime),
+            hasCheckedOut:
+              !!attendance.checkOutTime ||
+              shiftValues.some((s) => !!s?.checkOutTime),
             checkOutTime: attendance.checkOutTime || null,
             checkOutStatus: attendance.checkOutStatus || null,
             checkOutLocation: attendance.checkOutLocation || null,
@@ -1167,13 +1307,15 @@ function teacherRoutes(collections) {
       }
 
       const totalTeachersCount = unifiedList.length;
-      const presentCount = unifiedList.filter((item) => item.hasCheckedIn).length;
+      const presentCount = unifiedList.filter(
+        (item) => item.hasCheckedIn,
+      ).length;
       const absentCount = Math.max(0, totalTeachersCount - presentCount);
       const onTimeCount = unifiedList.filter(
-        (item) => item.hasCheckedIn && item.checkInStatus === "On Time"
+        (item) => item.hasCheckedIn && item.checkInStatus === "On Time",
       ).length;
       const lateCount = unifiedList.filter(
-        (item) => item.hasCheckedIn && item.checkInStatus === "Late"
+        (item) => item.hasCheckedIn && item.checkInStatus === "Late",
       ).length;
 
       let filteredList = unifiedList;
@@ -1183,7 +1325,7 @@ function teacherRoutes(collections) {
             (item.teacherId || "").toLowerCase().includes(search) ||
             (item.teacherName || "").toLowerCase().includes(search) ||
             (item.teacherEmail || "").toLowerCase().includes(search) ||
-            (item.designation || "").toLowerCase().includes(search)
+            (item.designation || "").toLowerCase().includes(search),
         );
       }
 
@@ -1193,11 +1335,11 @@ function teacherRoutes(collections) {
         filteredList = filteredList.filter((item) => !item.hasCheckedIn);
       } else if (statusFilter === "onTime") {
         filteredList = filteredList.filter(
-          (item) => item.hasCheckedIn && item.checkInStatus === "On Time"
+          (item) => item.hasCheckedIn && item.checkInStatus === "On Time",
         );
       } else if (statusFilter === "late") {
         filteredList = filteredList.filter(
-          (item) => item.hasCheckedIn && item.checkInStatus === "Late"
+          (item) => item.hasCheckedIn && item.checkInStatus === "Late",
         );
       }
 
@@ -1218,7 +1360,7 @@ function teacherRoutes(collections) {
       console.error("Admin teachers attendance error:", error);
       res.status(500).json({
         success: false,
-        message: "শিক্ষক হাজিরা তথ্য লোড করতে সমস্যা হয়েছে।",
+        message: "শিক্ষক এ্যাটেন্ডেন্স তথ্য লোড করতে সমস্যা হয়েছে।",
         error: error.message,
       });
     }
@@ -1241,8 +1383,11 @@ function teacherRoutes(collections) {
         .sort({ date: 1 })
         .toArray();
 
-      const distinctDates = Array.from(new Set(attendanceLogs.map((l) => l.date))).sort();
-      const totalWorkingDays = distinctDates.length > 0 ? distinctDates.length : 1;
+      const distinctDates = Array.from(
+        new Set(attendanceLogs.map((l) => l.date)),
+      ).sort();
+      const totalWorkingDays =
+        distinctDates.length > 0 ? distinctDates.length : 1;
 
       const logsByEmail = new Map();
       attendanceLogs.forEach((log) => {
@@ -1256,7 +1401,9 @@ function teacherRoutes(collections) {
 
       // Also append any teacher who has logs in this month but wasn't in unifiedCatalog
       const catalogEmails = new Set(
-        unifiedCatalog.map((t) => (t.email || "").trim().toLowerCase()).filter(Boolean)
+        unifiedCatalog
+          .map((t) => (t.email || "").trim().toLowerCase())
+          .filter(Boolean),
       );
       for (const [emailLower, logs] of logsByEmail.entries()) {
         if (!catalogEmails.has(emailLower) && logs.length > 0) {
@@ -1264,7 +1411,7 @@ function teacherRoutes(collections) {
           const sample = logs[logs.length - 1];
           const idx = unifiedCatalog.length;
           const normDesignation = normalizeDesignation(
-            sample.teacherDesignation || "শিক্ষক"
+            sample.teacherDesignation || "শিক্ষক",
           );
           unifiedCatalog.push({
             _id: sample._id,
@@ -1300,7 +1447,9 @@ function teacherRoutes(collections) {
 
         const onTimeDays = presentLogs.filter((l) => {
           if (l.shifts) {
-            const shiftValues = Object.values(l.shifts).filter((s) => !!s?.checkInTime);
+            const shiftValues = Object.values(l.shifts).filter(
+              (s) => !!s?.checkInTime,
+            );
             if (shiftValues.length > 0) {
               return shiftValues.every((s) => s.checkInStatus === "On Time");
             }
@@ -1310,7 +1459,9 @@ function teacherRoutes(collections) {
 
         const lateDays = presentLogs.filter((l) => {
           if (l.shifts) {
-            const shiftValues = Object.values(l.shifts).filter((s) => !!s?.checkInTime);
+            const shiftValues = Object.values(l.shifts).filter(
+              (s) => !!s?.checkInTime,
+            );
             if (shiftValues.some((s) => s.checkInStatus === "Late")) {
               return true;
             }
@@ -1320,7 +1471,9 @@ function teacherRoutes(collections) {
 
         const earlyExitDays = presentLogs.filter((l) => {
           if (l.shifts) {
-            const shiftValues = Object.values(l.shifts).filter((s) => !!s?.checkOutTime);
+            const shiftValues = Object.values(l.shifts).filter(
+              (s) => !!s?.checkOutTime,
+            );
             if (shiftValues.some((s) => s.checkOutStatus === "Early")) {
               return true;
             }
@@ -1330,7 +1483,9 @@ function teacherRoutes(collections) {
 
         const absentDays = Math.max(0, totalWorkingDays - presentDays);
         const attendanceRate =
-          totalWorkingDays > 0 ? Math.round((presentDays / totalWorkingDays) * 100) : 0;
+          totalWorkingDays > 0
+            ? Math.round((presentDays / totalWorkingDays) * 100)
+            : 0;
 
         const lateComments = [];
         const earlyComments = [];
@@ -1342,7 +1497,9 @@ function teacherRoutes(collections) {
 
           if (hasShifts) {
             const orderedKeys = ["shift1", "shift2", "shift3"];
-            const extraKeys = Object.keys(l.shifts).filter((k) => !orderedKeys.includes(k));
+            const extraKeys = Object.keys(l.shifts).filter(
+              (k) => !orderedKeys.includes(k),
+            );
             const allShiftKeys = [...orderedKeys, ...extraKeys];
 
             allShiftKeys.forEach((sKey) => {
@@ -1429,12 +1586,22 @@ function teacherRoutes(collections) {
 
       const rawTeachers = search
         ? unifiedCatalog.filter((t) => {
-            const nameMatch = (t.fullName || t.name || "").toLowerCase().includes(search);
-            const desigMatch = (t.designation || "").toLowerCase().includes(search);
+            const nameMatch = (t.fullName || t.name || "")
+              .toLowerCase()
+              .includes(search);
+            const desigMatch = (t.designation || "")
+              .toLowerCase()
+              .includes(search);
             const emailMatch = (t.email || "").toLowerCase().includes(search);
-            const phoneMatch = (t.phone || t.mobile || "").toLowerCase().includes(search);
-            const idMatch = (t.teacherId || t.idNo || "").toLowerCase().includes(search);
-            return nameMatch || desigMatch || emailMatch || phoneMatch || idMatch;
+            const phoneMatch = (t.phone || t.mobile || "")
+              .toLowerCase()
+              .includes(search);
+            const idMatch = (t.teacherId || t.idNo || "")
+              .toLowerCase()
+              .includes(search);
+            return (
+              nameMatch || desigMatch || emailMatch || phoneMatch || idMatch
+            );
           })
         : unifiedCatalog;
 
@@ -1500,7 +1667,9 @@ function teacherRoutes(collections) {
       let filter = {};
       if (ObjectId.isValid(targetId)) {
         try {
-          filter = { $or: [{ _id: new ObjectId(targetId) }, { _id: targetId }] };
+          filter = {
+            $or: [{ _id: new ObjectId(targetId) }, { _id: targetId }],
+          };
         } catch {
           filter = { _id: targetId };
         }
@@ -1524,7 +1693,9 @@ function teacherRoutes(collections) {
             .catch(() => null);
         }
         if (userDoc && userDoc.email) {
-          const escapedEmail = String(userDoc.email).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const escapedEmail = String(userDoc.email)
+            .trim()
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
           const emailFilter = {
             email: { $regex: new RegExp("^" + escapedEmail + "$", "i") },
           };
@@ -1540,7 +1711,7 @@ function teacherRoutes(collections) {
                 createdAt: new Date(),
               },
             },
-            { upsert: true }
+            { upsert: true },
           );
         }
       }

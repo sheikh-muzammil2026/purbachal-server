@@ -98,6 +98,7 @@ function sanitizeEnvValue(val, keyName = "") {
 }
 
 /**
+ *
  * Serverless-optimized MongoDB connection with global promise caching
  */
 async function connectDB() {
@@ -107,7 +108,7 @@ async function connectDB() {
     "aimpurbachal";
   if (!uri) {
     throw new Error(
-      "Missing MONGODB_URI environment variable. Please configure MONGODB_URI in your Vercel Project Settings."
+      "Missing MONGODB_URI environment variable. Please configure MONGODB_URI in your Vercel Project Settings.",
     );
   }
 
@@ -151,10 +152,17 @@ async function connectDB() {
       collections.marksCollection
         .createIndex(
           { studentId: 1, year: 1, subject: 1 },
-          { unique: true, name: "unique_student_year_subject", background: true }
+          {
+            unique: true,
+            name: "unique_student_year_subject",
+            background: true,
+          },
         )
         .catch((idxErr) => {
-          console.warn("Marks unique index warning:", idxErr?.message || idxErr);
+          console.warn(
+            "Marks unique index warning:",
+            idxErr?.message || idxErr,
+          );
         });
     }
 
@@ -172,75 +180,98 @@ const getCollections = () => collections;
 /**
  * Proxy for database object to allow synchronous routing setup
  */
-const dbProxy = new Proxy({}, {
-  get(target, prop) {
-    if (prop === "then" || typeof prop === "symbol") {
-      return undefined;
-    }
-    if (prop === "collection") {
-      return (collectionName) => {
-        return new Proxy({}, {
-          get(colTarget, colProp) {
-            if (colProp === "then" || typeof colProp === "symbol") {
-              return undefined;
-            }
-            if (!database) {
-              throw new Error("Database not connected yet. Await connectDB() before querying.");
-            }
-            const actualCol = database.collection(collectionName);
-            const val = Reflect.get(actualCol, colProp);
-            return typeof val === "function" ? val.bind(actualCol) : val;
-          },
-        });
-      };
-    }
-    if (!database) {
-      throw new Error("Database not connected yet. Await connectDB() before querying.");
-    }
-    const val = Reflect.get(database, prop);
-    return typeof val === "function" ? val.bind(database) : val;
+const dbProxy = new Proxy(
+  {},
+  {
+    get(target, prop) {
+      if (prop === "then" || typeof prop === "symbol") {
+        return undefined;
+      }
+      if (prop === "collection") {
+        return (collectionName) => {
+          return new Proxy(
+            {},
+            {
+              get(colTarget, colProp) {
+                if (colProp === "then" || typeof colProp === "symbol") {
+                  return undefined;
+                }
+                if (!database) {
+                  throw new Error(
+                    "Database not connected yet. Await connectDB() before querying.",
+                  );
+                }
+                const actualCol = database.collection(collectionName);
+                const val = Reflect.get(actualCol, colProp);
+                return typeof val === "function" ? val.bind(actualCol) : val;
+              },
+            },
+          );
+        };
+      }
+      if (!database) {
+        throw new Error(
+          "Database not connected yet. Await connectDB() before querying.",
+        );
+      }
+      const val = Reflect.get(database, prop);
+      return typeof val === "function" ? val.bind(database) : val;
+    },
   },
-});
+);
 
 /**
  * Proxy for collections object to allow synchronous routing setup
  */
-const collectionsProxy = new Proxy({}, {
-  get(target, prop) {
-    if (prop === "then" || prop === "use" || typeof prop === "symbol") {
-      return undefined;
-    }
-    if (database && !(prop in collections)) {
-      return undefined;
-    }
-    return new Proxy({}, {
-      get(colTarget, colProp) {
-        if (colProp === "then" || typeof colProp === "symbol") {
-          return undefined;
-        }
-        if (!database || !collections[prop]) {
-          throw new Error(`Collection '${String(prop)}' accessed before database connection. Await connectDB() first.`);
-        }
-        const actualCol = collections[prop];
-        const val = Reflect.get(actualCol, colProp);
-        return typeof val === "function" ? val.bind(actualCol) : val;
-      },
-    });
+const collectionsProxy = new Proxy(
+  {},
+  {
+    get(target, prop) {
+      if (prop === "then" || prop === "use" || typeof prop === "symbol") {
+        return undefined;
+      }
+      if (database && !(prop in collections)) {
+        return undefined;
+      }
+      return new Proxy(
+        {},
+        {
+          get(colTarget, colProp) {
+            if (colProp === "then" || typeof colProp === "symbol") {
+              return undefined;
+            }
+            if (!database || !collections[prop]) {
+              throw new Error(
+                `Collection '${String(prop)}' accessed before database connection. Await connectDB() first.`,
+              );
+            }
+            const actualCol = collections[prop];
+            const val = Reflect.get(actualCol, colProp);
+            return typeof val === "function" ? val.bind(actualCol) : val;
+          },
+        },
+      );
+    },
   },
-});
+);
 
 /**
  * Proxy for client object to avoid premature unhandled initialization
  */
-const clientProxy = new Proxy({}, {
-  get(target, prop) {
-    if (!client) {
-      throw new Error("MongoClient not initialized yet. Await connectDB() first.");
-    }
-    const val = Reflect.get(client, prop);
-    return typeof val === "function" ? val.bind(client) : val;
+const clientProxy = new Proxy(
+  {},
+  {
+    get(target, prop) {
+      if (!client) {
+        throw new Error(
+          "MongoClient not initialized yet. Await connectDB() first.",
+        );
+      }
+      const val = Reflect.get(client, prop);
+      return typeof val === "function" ? val.bind(client) : val;
+    },
   },
-});
+);
 
 module.exports = {
   client: clientProxy,
