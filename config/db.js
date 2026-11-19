@@ -58,6 +58,7 @@ function initializeCollections(db) {
     financeCategoriesCollection: db.collection("finance_categories"),
     teachersCollection: db.collection("teachers"),
     usersCollection: db.collection("user"),
+    sessionsCollection: db.collection("session"),
     accountsCollection: db.collection("account"),
     verificationTokensCollection: db.collection("verification_tokens"),
     syllabusCollection: db.collection("syllabus"),

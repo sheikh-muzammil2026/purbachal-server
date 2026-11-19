@@ -770,7 +770,9 @@ function parentRoutes(app, db) {
           sessionYear,
           section: student.section || "ক (আবু বকর রা.)",
           shift: student.shift || "দিবা / সকাল",
-          institutionName: "দারুল উলুম আল-ইসলামিয়া হাবিবগঞ্জ",
+          institutionName:
+            process.env.INSTITUTION_NAME_BN ||
+            "আস সালাম আইডিয়াল মাদরাসা (এইম) পূর্বাচল",
         },
         periods,
         days: ["শনিবার", "রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার"],

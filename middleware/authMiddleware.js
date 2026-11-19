@@ -7,6 +7,12 @@ const requireAdmin = (getAuthUser) => {
   return async (req, res, next) => {
     try {
       const user = await getAuthUser(req);
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "অথেনটিকেশন প্রয়োজন। অনুগ্রহ করে পুনরায় লগইন করুন।",
+        });
+      }
       if (!isAdminUser(user)) {
         return res.status(403).json({
           success: false,

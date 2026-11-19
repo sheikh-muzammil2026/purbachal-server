@@ -76,7 +76,7 @@ app.use(syllabusRoutes(collectionsProxy, authHelpers, dbProxy));
 app.use(resultRoutes(collectionsProxy, authHelpers, dbProxy));
 
 // Mount Existing Domain Modules
-administrationRoutes(app, dbProxy);
+administrationRoutes(app, dbProxy, authHelpers);
 noticeRoutes(app, dbProxy);
 smartClassroomRoutes(app, dbProxy);
 parentRoutes(app, dbProxy);

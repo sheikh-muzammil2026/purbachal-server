@@ -1565,7 +1565,64 @@ function financeRoutes(collections) {
   });
 
   /**
-   * ৫.৩. ক্যাটাগরি ডিলিট করার API
+   * ৫.৩. ক্যাটাগরি আপডেট করার API
+   * Endpoint: PUT /api/finance/categories/:id
+   */
+  router.put("/api/finance/categories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!ObjectId.isValid(id)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "অকার্যকর আইডি।" });
+      }
+
+      const { name, presetFee } = req.body;
+      const trimmedName = typeof name === "string" ? name.trim() : "";
+      if (!trimmedName) {
+        return res
+          .status(400)
+          .json({ success: false, message: "খাতের নাম দেওয়া আবশ্যক।" });
+      }
+
+      const parsedFee = parseFloat(presetFee);
+      const updatedFields = {
+        name: trimmedName,
+        presetFee: Number.isFinite(parsedFee) && parsedFee >= 0 ? parsedFee : 0,
+        updatedAt: new Date(),
+      };
+
+      const objectId = new ObjectId(id);
+      const result = await financeCategoriesCollection.updateOne(
+        { _id: objectId },
+        { $set: updatedFields },
+      );
+      if (result.matchedCount === 0) {
+        return res
+          .status(404)
+          .json({ success: false, message: "খাতটি পাওয়া যায়নি।" });
+      }
+
+      const updatedCategory = await financeCategoriesCollection.findOne({
+        _id: objectId,
+      });
+
+      res.json({
+        success: true,
+        message: "খাত সফলভাবে আপডেট করা হয়েছে!",
+        data: updatedCategory,
+      });
+    } catch (error) {
+      console.error("Category update error:", error);
+      res.status(500).json({
+        success: false,
+        message: "সার্ভারে খাতটি আপডেট করতে সমস্যা হয়েছে।",
+      });
+    }
+  });
+
+  /**
+   * ৫.৪. ক্যাটাগরি ডিলিট করার API
    * Endpoint: DELETE /api/finance/categories/:id
    */
   router.delete("/api/finance/categories/:id", async (req, res) => {

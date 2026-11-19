@@ -133,6 +133,7 @@ function noticesRoutes(app, db) {
         title,
         description = "",
         category = "general",
+        priority = "normal",
         showInTicker = false,
         isActive = true,
         publishDate = new Date(),
@@ -149,9 +150,9 @@ function noticesRoutes(app, db) {
 
       const newNotice = {
         title: title.trim(),
-        description: description.trim(),
-        category: category.trim().toLowerCase(),
-        priority: priority.trim().toLowerCase(),
+        description: (description || "").trim(),
+        category: (category || "general").trim().toLowerCase(),
+        priority: (priority || "normal").trim().toLowerCase(),
         showInTicker: Boolean(showInTicker),
         isActive: isActive !== false,
         publishDate: publishDate ? new Date(publishDate) : new Date(),

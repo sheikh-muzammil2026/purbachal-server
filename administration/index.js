@@ -1,4 +1,6 @@
 const { ObjectId } = require("mongodb");
+const { requireAdmin } = require("../middleware/authMiddleware");
+const { createAuthHelpers } = require("../utils/authHelpers");
 
 const getIdFilter = (id) => {
   const strId = String(id);
@@ -29,9 +31,18 @@ const resolveUserAndCol = async (db, id) => {
   return { col, user: null, filter };
 };
 
-function administrationRoutes(app, db) {
+function administrationRoutes(app, db, authHelpers = null) {
+  const resolvedAuthHelpers =
+    authHelpers ||
+    createAuthHelpers({
+      usersCollection: db.collection("user"),
+      teachersCollection: db.collection("teachers"),
+      sessionsCollection: db.collection("session"),
+    });
+  const adminGuard = requireAdmin(resolvedAuthHelpers.getAuthUser);
+
   // 1. GET /api/admin/users - Fetch users with pagination and search filters
-  app.get("/api/admin/users", async (req, res) => {
+  app.get("/api/admin/users", adminGuard, async (req, res) => {
     try {
       const { page = 1, limit = 10, search = "", role = "all", status = "all" } = req.query;
       const col = await getTargetCollection(db);
@@ -95,7 +106,7 @@ function administrationRoutes(app, db) {
   });
 
   // 2. PATCH /api/admin/users/:id/role - Update primary role
-  app.patch("/api/admin/users/:id/role", async (req, res) => {
+  app.patch("/api/admin/users/:id/role", adminGuard, async (req, res) => {
     try {
       const { id } = req.params;
       const { role } = req.body;
@@ -130,7 +141,7 @@ function administrationRoutes(app, db) {
   });
 
   // 3. PATCH /api/admin/users/:id/permissions - Update permissions array
-  app.patch("/api/admin/users/:id/permissions", async (req, res) => {
+  app.patch("/api/admin/users/:id/permissions", adminGuard, async (req, res) => {
     try {
       const { id } = req.params;
       const { permissions } = req.body;
@@ -165,7 +176,7 @@ function administrationRoutes(app, db) {
   });
 
   // 4. PATCH /api/admin/users/:id/status - Toggle account status (banned/active)
-  app.patch("/api/admin/users/:id/status", async (req, res) => {
+  app.patch("/api/admin/users/:id/status", adminGuard, async (req, res) => {
     try {
       const { id } = req.params;
       const { isBanned, status } = req.body;
@@ -200,7 +211,7 @@ function administrationRoutes(app, db) {
   });
 
   // 5. DELETE /api/admin/users/:id - Permanent removal
-  app.delete("/api/admin/users/:id", async (req, res) => {
+  app.delete("/api/admin/users/:id", adminGuard, async (req, res) => {
     try {
       const { id } = req.params;
       const { col, user, filter } = await resolveUserAndCol(db, id);
