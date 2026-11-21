@@ -1,7 +1,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const {
-  isWithinMadrasaGeofence,
+  validateAttendanceLocation,
   getDhakaTime,
   evaluateCheckInStatus,
   evaluateCheckOutStatus,
@@ -617,7 +617,7 @@ function teacherRoutes(collections) {
   router.post("/api/attendance/check-in", async (req, res) => {
     try {
       const body = req.body || {};
-      const { lat, lng, mockInPremises } = body;
+      const { lat, lng, accuracy } = body;
 
       const user = await getAuthTeacher(req, body);
       if (!user) {
@@ -627,31 +627,17 @@ function teacherRoutes(collections) {
         });
       }
 
-      if (lat === undefined || lng === undefined) {
-        return res.status(400).json({
-          success: false,
-          message: "ডিভাইসের অবস্থান (Latitude ও Longitude) প্রয়োজন।",
-        });
+      const locCheck = validateAttendanceLocation({ lat, lng, accuracy });
+      if (!locCheck.ok) {
+        return res.status(locCheck.status).json(locCheck.payload);
       }
 
-      const effectiveLat = Number(lat);
-      const effectiveLng = Number(lng);
-
-      if (!mockInPremises) {
-        const geofenceResult = isWithinMadrasaGeofence(
-          effectiveLat,
-          effectiveLng,
-        );
-        if (!geofenceResult.isInside) {
-          return res.status(403).json({
-            success: false,
-            message:
-              "You must be inside the madrasa premises to submit attendance.",
-            distance: geofenceResult.distance,
-            threshold: geofenceResult.threshold,
-          });
-        }
-      }
+      const {
+        lat: effectiveLat,
+        lng: effectiveLng,
+        accuracy: effectiveAccuracy,
+        geofenceResult,
+      } = locCheck;
 
       const category = getTeacherCategory(user.designation);
       const isMultiShift = category === "residential" || category === "hifz";
@@ -710,6 +696,8 @@ function teacherRoutes(collections) {
           checkInLocation: {
             lat: effectiveLat,
             lng: effectiveLng,
+            accuracy: effectiveAccuracy,
+            distance: geofenceResult.distance,
           },
           checkOutTime: null,
           checkOutStatus: null,
@@ -766,6 +754,8 @@ function teacherRoutes(collections) {
           checkInLocation: {
             lat: effectiveLat,
             lng: effectiveLng,
+            accuracy: effectiveAccuracy,
+            distance: geofenceResult.distance,
           },
           checkOutTime: null,
           checkOutStatus: null,
@@ -787,6 +777,8 @@ function teacherRoutes(collections) {
             updateFields.checkInLocation = {
               lat: effectiveLat,
               lng: effectiveLng,
+              accuracy: effectiveAccuracy,
+              distance: geofenceResult.distance,
             };
           }
           await teacherAttendanceCollection.updateOne(
@@ -807,7 +799,12 @@ function teacherRoutes(collections) {
             checkInTime: now.toISOString(),
             checkInStatus: checkInStatus,
             checkInComment: checkInComment || null,
-            checkInLocation: { lat: effectiveLat, lng: effectiveLng },
+            checkInLocation: {
+              lat: effectiveLat,
+              lng: effectiveLng,
+              accuracy: effectiveAccuracy,
+              distance: geofenceResult.distance,
+            },
             checkOutTime: null,
             checkOutStatus: null,
             checkOutLocation: null,
@@ -851,7 +848,7 @@ function teacherRoutes(collections) {
   router.post("/api/attendance/check-out", async (req, res) => {
     try {
       const body = req.body || {};
-      const { lat, lng, mockInPremises } = body;
+      const { lat, lng, accuracy } = body;
 
       const user = await getAuthTeacher(req, body);
       if (!user) {
@@ -861,31 +858,17 @@ function teacherRoutes(collections) {
         });
       }
 
-      if (lat === undefined || lng === undefined) {
-        return res.status(400).json({
-          success: false,
-          message: "ডিভাইসের অবস্থান (Latitude ও Longitude) প্রয়োজন।",
-        });
+      const locCheck = validateAttendanceLocation({ lat, lng, accuracy });
+      if (!locCheck.ok) {
+        return res.status(locCheck.status).json(locCheck.payload);
       }
 
-      const effectiveLat = Number(lat);
-      const effectiveLng = Number(lng);
-
-      if (!mockInPremises) {
-        const geofenceResult = isWithinMadrasaGeofence(
-          effectiveLat,
-          effectiveLng,
-        );
-        if (!geofenceResult.isInside) {
-          return res.status(403).json({
-            success: false,
-            message:
-              "You must be inside the madrasa premises to submit attendance.",
-            distance: geofenceResult.distance,
-            threshold: geofenceResult.threshold,
-          });
-        }
-      }
+      const {
+        lat: effectiveLat,
+        lng: effectiveLng,
+        accuracy: effectiveAccuracy,
+        geofenceResult,
+      } = locCheck;
 
       const category = getTeacherCategory(user.designation);
       const isMultiShift = category === "residential" || category === "hifz";
@@ -950,6 +933,8 @@ function teacherRoutes(collections) {
         const checkOutLocation = {
           lat: effectiveLat,
           lng: effectiveLng,
+          accuracy: effectiveAccuracy,
+          distance: geofenceResult.distance,
         };
 
         await teacherAttendanceCollection.updateOne(
@@ -1003,6 +988,8 @@ function teacherRoutes(collections) {
         const checkOutLocation = {
           lat: effectiveLat,
           lng: effectiveLng,
+          accuracy: effectiveAccuracy,
+          distance: geofenceResult.distance,
         };
 
         const updateFields = {

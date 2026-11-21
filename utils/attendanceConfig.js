@@ -1,11 +1,25 @@
+function parseFiniteNumber(value, fallback) {
+  if (value === undefined || value === null || String(value).trim() === "") {
+    return fallback;
+  }
+  const parsed = parseFloat(String(value).trim());
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 // Fixed Geofence Configuration for Madrasa premises
 // As-Salam Ideal Madrasah (AIM) Purbachal Campus
 const MADRASA_LOCATION = {
-  LATITUDE: parseFloat(process.env.MADRASA_LAT || "23.860061"),
-  LONGITUDE: parseFloat(process.env.MADRASA_LNG || "90.546755"),
-  RADIUS_METERS: parseFloat(process.env.MADRASA_RADIUS || "15"),
-  MAX_ALLOWED_ACCURACY_METERS: 500,
-  ACCURACY_TOLERANCE_METERS: 50,
+  LATITUDE: parseFiniteNumber(process.env.MADRASA_LAT, 23.860061),
+  LONGITUDE: parseFiniteNumber(process.env.MADRASA_LNG, 90.546755),
+  RADIUS_METERS: parseFiniteNumber(process.env.MADRASA_RADIUS, 15),
+  MAX_ALLOWED_ACCURACY_METERS: parseFiniteNumber(
+    process.env.MADRASA_MAX_ALLOWED_ACCURACY,
+    500,
+  ),
+  ACCURACY_TOLERANCE_METERS: parseFiniteNumber(
+    process.env.MADRASA_ACCURACY_TOLERANCE,
+    50,
+  ),
   NAME: "আস সালাম আইডিয়াল মাদরাসা (এইম) পুর্বাচল ক্যাম্পাস",
   ADDRESS: "কাজিরবাগ (পুর্বাচল সংলগ্ন), রূপগঞ্জ, নারায়ণগঞ্জ।",
 };
@@ -49,10 +63,10 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
     typeof lon1 !== "number" ||
     typeof lat2 !== "number" ||
     typeof lon2 !== "number" ||
-    isNaN(lat1) ||
-    isNaN(lon1) ||
-    isNaN(lat2) ||
-    isNaN(lon2)
+    !Number.isFinite(lat1) ||
+    !Number.isFinite(lon1) ||
+    !Number.isFinite(lat2) ||
+    !Number.isFinite(lon2)
   ) {
     return Infinity;
   }
@@ -72,7 +86,8 @@ function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
       Math.sin(deltaLambda / 2) *
       Math.sin(deltaLambda / 2);
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const clampedA = Math.min(1, Math.max(0, a));
+  const c = 2 * Math.atan2(Math.sqrt(clampedA), Math.sqrt(1 - clampedA));
 
   return R * c;
 }
@@ -88,6 +103,10 @@ function isWithinMadrasaGeofence(
 ) {
   const latNum = Number(userLat);
   const lngNum = Number(userLng);
+  const radiusNum =
+    Number.isFinite(Number(customRadius)) && Number(customRadius) > 0
+      ? Number(customRadius)
+      : MADRASA_LOCATION.RADIUS_METERS;
 
   if (
     !Number.isFinite(latNum) ||
@@ -102,7 +121,8 @@ function isWithinMadrasaGeofence(
       isInside: false,
       isValidCoords: false,
       distance: Infinity,
-      threshold: customRadius,
+      threshold: radiusNum,
+      effectiveThreshold: radiusNum,
       accuracy: Number(accuracy) || 0,
       reason: "INVALID_COORDINATES",
     };
@@ -119,20 +139,114 @@ function isWithinMadrasaGeofence(
     MADRASA_LOCATION.LONGITUDE,
   );
 
-  // Allow minor GPS jitter up to ACCURACY_TOLERANCE_METERS (50m) if accuracy is reported
+  // Allow indoor GPS drift up to ACCURACY_TOLERANCE_METERS (50m) if accuracy is reported
   const tolerance = Math.min(
     accNum,
     MADRASA_LOCATION.ACCURACY_TOLERANCE_METERS || 50,
   );
-  const effectiveThreshold = customRadius + tolerance;
+  const roundedDistance = Math.round(distance);
+  const effectiveThreshold = Math.round(radiusNum + tolerance);
 
   return {
-    isInside: distance <= effectiveThreshold,
+    isInside: roundedDistance <= effectiveThreshold,
     isValidCoords: true,
-    distance: Math.round(distance),
-    threshold: customRadius,
-    effectiveThreshold: Math.round(effectiveThreshold),
+    distance: roundedDistance,
+    threshold: radiusNum,
+    effectiveThreshold,
     accuracy: accNum,
+  };
+}
+
+/**
+ * Centralized server-side location & geofence payload validator
+ * Used by both Teacher and Staff check-in / check-out endpoints
+ */
+function validateAttendanceLocation({ lat, lng, accuracy } = {}) {
+  if (
+    lat === undefined ||
+    lng === undefined ||
+    lat === null ||
+    lng === null ||
+    String(lat).trim() === "" ||
+    String(lng).trim() === ""
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        message:
+          "ডিভাইসের GPS অবস্থান (Latitude ও Longitude) প্রয়োজন। অনুগ্রহ করে ব্রাউজারের লোকেশন পারমিশন অন করুন।",
+      },
+    };
+  }
+
+  const effectiveLat = Number(lat);
+  const effectiveLng = Number(lng);
+  const effectiveAccuracy =
+    Number.isFinite(Number(accuracy)) && Number(accuracy) > 0
+      ? Math.round(Number(accuracy))
+      : 0;
+
+  if (
+    effectiveAccuracy > 0 &&
+    MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS &&
+    effectiveAccuracy > MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        message: `আপনার ডিভাইসের GPS সংকেত অত্যন্ত দুর্বল (Accuracy: ±${effectiveAccuracy} মিটার)। অনুগ্রহ করে খোলা স্থানে গিয়ে পুনরায় লোকেশন রিফ্রেশ করুন।`,
+        accuracy: effectiveAccuracy,
+        maxAllowedAccuracy: MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS,
+      },
+    };
+  }
+
+  const geofenceResult = isWithinMadrasaGeofence(
+    effectiveLat,
+    effectiveLng,
+    MADRASA_LOCATION.RADIUS_METERS,
+    effectiveAccuracy,
+  );
+
+  if (!geofenceResult.isValidCoords) {
+    return {
+      ok: false,
+      status: 400,
+      payload: {
+        success: false,
+        message:
+          "অবৈধ GPS স্থানাঙ্ক শনাক্ত হয়েছে। অনুগ্রহ করে পুনরায় লোকেশন রিফ্রেশ করুন।",
+      },
+    };
+  }
+
+  if (!geofenceResult.isInside) {
+    const accuracyNote =
+      effectiveAccuracy > 0 ? ` (GPS ±${effectiveAccuracy} মিটার)` : "";
+    return {
+      ok: false,
+      status: 403,
+      payload: {
+        success: false,
+        message: `হাজিরা দিতে আপনাকে অবশ্যই মাদরাসা প্রাঙ্গণে (${geofenceResult.threshold} মিটারের মধ্যে) থাকতে হবে। আপনার বর্তমান দূরত্ব: ${geofenceResult.distance} মিটার${accuracyNote}।`,
+        distance: geofenceResult.distance,
+        threshold: geofenceResult.threshold,
+        effectiveThreshold: geofenceResult.effectiveThreshold,
+        accuracy: effectiveAccuracy,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    lat: effectiveLat,
+    lng: effectiveLng,
+    accuracy: effectiveAccuracy,
+    geofenceResult,
   };
 }
 
@@ -527,6 +641,7 @@ module.exports = {
   HIFZ_ATTENDANCE_RULES,
   calculateDistanceMeters,
   isWithinMadrasaGeofence,
+  validateAttendanceLocation,
   getDhakaTime,
   evaluateCheckInStatus,
   evaluateCheckOutStatus,

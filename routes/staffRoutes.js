@@ -1,7 +1,7 @@
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const {
-  isWithinMadrasaGeofence,
+  validateAttendanceLocation,
   getDhakaTime,
   evaluateStaffCheckInStatus,
   evaluateStaffCheckOutStatus,
@@ -489,52 +489,17 @@ function staffRoutes(collections, authHelpers, database) {
         });
       }
 
-      if (lat === undefined || lng === undefined || lat === null || lng === null) {
-        return res.status(400).json({
-          success: false,
-          message: "ডিভাইসের GPS অবস্থান (Latitude ও Longitude) প্রয়োজন। অনুগ্রহ করে ব্রাউজারের লোকেশন পারমিশন অন করুন।",
-        });
+      const locCheck = validateAttendanceLocation({ lat, lng, accuracy });
+      if (!locCheck.ok) {
+        return res.status(locCheck.status).json(locCheck.payload);
       }
 
-      const effectiveLat = Number(lat);
-      const effectiveLng = Number(lng);
-      const effectiveAccuracy = Number.isFinite(Number(accuracy)) ? Math.round(Number(accuracy)) : 0;
-
-      if (
-        effectiveAccuracy > 0 &&
-        MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS &&
-        effectiveAccuracy > MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `আপনার ডিভাইসের GPS সংকেত অত্যন্ত দুর্বল (Accuracy: ±${effectiveAccuracy} মিটার)। অনুগ্রহ করে খোলা স্থানে গিয়ে পুনরায় লোকেশন রিফ্রেশ করুন।`,
-          accuracy: effectiveAccuracy,
-        });
-      }
-
-      const geofenceResult = isWithinMadrasaGeofence(
-        effectiveLat,
-        effectiveLng,
-        MADRASA_LOCATION.RADIUS_METERS,
-        effectiveAccuracy
-      );
-
-      if (!geofenceResult.isValidCoords) {
-        return res.status(400).json({
-          success: false,
-          message: "অবৈধ GPS স্থানাঙ্ক শনাক্ত হয়েছে। অনুগ্রহ করে পুনরায় লোকেশন রিফ্রেশ করুন।",
-        });
-      }
-
-      if (!geofenceResult.isInside) {
-        return res.status(403).json({
-          success: false,
-          message: `হাজিরা দিতে আপনাকে অবশ্যই মাদরাসা প্রাঙ্গণে (${geofenceResult.threshold} মিটারের মধ্যে) থাকতে হবে। আপনার বর্তমান দূরত্ব: ${geofenceResult.distance} মিটার।`,
-          distance: geofenceResult.distance,
-          threshold: geofenceResult.threshold,
-          accuracy: effectiveAccuracy,
-        });
-      }
+      const {
+        lat: effectiveLat,
+        lng: effectiveLng,
+        accuracy: effectiveAccuracy,
+        geofenceResult,
+      } = locCheck;
 
       const { dateStr } = getDhakaTime();
       const now = new Date();
@@ -654,52 +619,17 @@ function staffRoutes(collections, authHelpers, database) {
         });
       }
 
-      if (lat === undefined || lng === undefined || lat === null || lng === null) {
-        return res.status(400).json({
-          success: false,
-          message: "ডিভাইসের GPS অবস্থান (Latitude ও Longitude) প্রয়োজন। অনুগ্রহ করে ব্রাউজারের লোকেশন পারমিশন অন করুন।",
-        });
+      const locCheck = validateAttendanceLocation({ lat, lng, accuracy });
+      if (!locCheck.ok) {
+        return res.status(locCheck.status).json(locCheck.payload);
       }
 
-      const effectiveLat = Number(lat);
-      const effectiveLng = Number(lng);
-      const effectiveAccuracy = Number.isFinite(Number(accuracy)) ? Math.round(Number(accuracy)) : 0;
-
-      if (
-        effectiveAccuracy > 0 &&
-        MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS &&
-        effectiveAccuracy > MADRASA_LOCATION.MAX_ALLOWED_ACCURACY_METERS
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: `আপনার ডিভাইসের GPS সংকেত অত্যন্ত দুর্বল (Accuracy: ±${effectiveAccuracy} মিটার)। অনুগ্রহ করে খোলা স্থানে গিয়ে পুনরায় লোকেশন রিফ্রেশ করুন।`,
-          accuracy: effectiveAccuracy,
-        });
-      }
-
-      const geofenceResult = isWithinMadrasaGeofence(
-        effectiveLat,
-        effectiveLng,
-        MADRASA_LOCATION.RADIUS_METERS,
-        effectiveAccuracy
-      );
-
-      if (!geofenceResult.isValidCoords) {
-        return res.status(400).json({
-          success: false,
-          message: "অবৈধ GPS স্থানাঙ্ক শনাক্ত হয়েছে। অনুগ্রহ করে পুনরায় লোকেশন রিফ্রেশ করুন।",
-        });
-      }
-
-      if (!geofenceResult.isInside) {
-        return res.status(403).json({
-          success: false,
-          message: `হাজিরা দিতে আপনাকে অবশ্যই মাদরাসা প্রাঙ্গণে (${geofenceResult.threshold} মিটারের মধ্যে) থাকতে হবে। আপনার বর্তমান দূরত্ব: ${geofenceResult.distance} মিটার।`,
-          distance: geofenceResult.distance,
-          threshold: geofenceResult.threshold,
-          accuracy: effectiveAccuracy,
-        });
-      }
+      const {
+        lat: effectiveLat,
+        lng: effectiveLng,
+        accuracy: effectiveAccuracy,
+        geofenceResult,
+      } = locCheck;
 
       const { dateStr } = getDhakaTime();
       const now = new Date();
@@ -862,6 +792,7 @@ function staffRoutes(collections, authHelpers, database) {
         },
         attendance: attendance || null,
         shiftPhase,
+        madrasaLocation: MADRASA_LOCATION,
         rules: STAFF_ATTENDANCE_RULES,
       });
     } catch (error) {
